@@ -93,6 +93,9 @@
 </head>
 <body>
     <button id="theme-toggle" class="icon-btn" style="float:right; margin-top:0.5em;" data-tooltip="Toggle Light/Dark Mode" title="Toggle Light/Dark Mode" aria-label="Toggle Light/Dark Mode">&#9788;</button>
+    <button id="export-btn" class="icon-btn" style="float:right; margin-top:0.5em; margin-right:0.5em;" data-tooltip="Export Groups" title="Export Groups" aria-label="Export Groups">&#128190;</button>
+    <button id="import-btn" class="icon-btn" style="float:right; margin-top:0.5em; margin-right:0.5em;" data-tooltip="Import Groups" title="Import Groups" aria-label="Import Groups">&#128228;</button>
+    <input type="file" id="import-file" accept="application/json" style="display:none;">
     <h1>What's new Tube?!</h1>
     <form id="group-form">
         <input type="text" id="group-name" placeholder="New group name" required>
@@ -131,7 +134,7 @@
             const shortsFilter = getShortsFilter();
             const groupsDiv = document.getElementById('groups');
             groupsDiv.innerHTML = '';
-            Object.entries(groups).forEach(([group, channels]) => {
+            Object.entries(groups).forEach(([group, channels], groupIdx, groupArr) => {
                 const groupDiv = document.createElement('div');
                 groupDiv.className = 'group';
                 const isCollapsed = collapsedGroups[group];
@@ -140,6 +143,8 @@
                     <button onclick="toggleGroup('${group}')" class="icon-btn" data-tooltip="${isCollapsed ? 'Expand Group' : 'Collapse Group'}" title="${isCollapsed ? 'Expand Group' : 'Collapse Group'}" aria-label="${isCollapsed ? 'Expand Group' : 'Collapse Group'}">
                         ${isCollapsed ? '&#x25B6;' : '&#x25BC;'}
                     </button>
+                    <button onclick="moveGroup('${group}', -1)" class="icon-btn" data-tooltip="Move Group Up" title="Move Group Up" aria-label="Move Group Up" ${groupIdx === 0 ? 'disabled' : ''}>&#8593;</button>
+                    <button onclick="moveGroup('${group}', 1)" class="icon-btn" data-tooltip="Move Group Down" title="Move Group Down" aria-label="Move Group Down" ${groupIdx === groupArr.length - 1 ? 'disabled' : ''}>&#8595;</button>
                     ${!isCollapsed ? `
                         <button onclick="deleteGroup('${group}')" class="icon-btn" data-tooltip="Delete Group" title="Delete Group" aria-label="Delete Group">&#128465;</button>
                         <button onclick="reloadGroupFeeds('${group}')" class="icon-btn" data-tooltip="Reload Feeds" title="Reload Feeds" aria-label="Reload Feeds">&#x21bb;</button>
@@ -155,6 +160,8 @@
                                     ${ch.title ? `${ch.title} (${ch.id})` : ch.id}
                                     <button onclick="removeChannel('${group}', ${i})" class="icon-btn" data-tooltip="Remove Channel" title="Remove Channel" aria-label="Remove Channel">&#128465;</button>
                                     <button onclick="toggleShorts('${group}','${ch.id}')" class="icon-btn" data-tooltip="${showShorts ? 'Hide Shorts' : 'Show Shorts'}" title="${showShorts ? 'Hide Shorts' : 'Show Shorts'}" aria-label="${showShorts ? 'Hide Shorts' : 'Show Shorts'}">&#x1f456;</button>
+                                    <button onclick="moveChannel('${group}', ${i}, -1)" class="icon-btn" data-tooltip="Move Up" title="Move Up" aria-label="Move Up" ${i === 0 ? 'disabled' : ''}>&#8593;</button>
+                                    <button onclick="moveChannel('${group}', ${i}, 1)" class="icon-btn" data-tooltip="Move Down" title="Move Down" aria-label="Move Down" ${i === channels.length - 1 ? 'disabled' : ''}>&#8595;</button>
                                     ${ch.entries && ch.entries.length ? `
                                         <div style="display: flex; gap: 1em; margin-top: 0.5em;">
                                             ${ch.entries
@@ -274,6 +281,34 @@
             renderGroups();
         };
 
+        // Add this function to move channels up or down:
+        window.moveChannel = function(group, idx, dir) {
+            const groups = getGroups();
+            const arr = groups[group];
+            const newIdx = idx + dir;
+            if (newIdx < 0 || newIdx >= arr.length) return;
+            [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+            saveGroups(groups);
+            renderGroups();
+        };
+
+        // Add this function to move groups up or down:
+        window.moveGroup = function(group, dir) {
+            const groups = getGroups();
+            const keys = Object.keys(groups);
+            const idx = keys.indexOf(group);
+            const newIdx = idx + dir;
+            if (newIdx < 0 || newIdx >= keys.length) return;
+            // Reorder keys
+            const newKeys = [...keys];
+            [newKeys[idx], newKeys[newIdx]] = [newKeys[newIdx], newKeys[idx]];
+            // Build new groups object with new order
+            const newGroups = {};
+            newKeys.forEach(k => { newGroups[k] = groups[k]; });
+            saveGroups(newGroups);
+            renderGroups();
+        };
+
         // --- Theme toggle ---
         function setTheme(dark) {
             if (dark) {
@@ -291,6 +326,66 @@
         };
         // On load, set theme from localStorage
         setTheme(localStorage.getItem('darkMode') === '1');
+
+        // --- Export groups config ---
+        document.getElementById('export-btn').onclick = function() {
+            const groups = getGroups();
+            // Only export group names and channel IDs
+            const exportData = {};
+            Object.entries(groups).forEach(([group, channels]) => {
+                exportData[group] = channels.map(ch => ch.id);
+            });
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'whatsnewtube-groups.json';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+        };
+
+        // --- Import groups config ---
+        document.getElementById('import-btn').onclick = function() {
+            document.getElementById('import-file').click();
+        };
+        document.getElementById('import-file').onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if (typeof data !== 'object' || Array.isArray(data)) throw new Error();
+                    // Validate: all values should be arrays of strings
+                    for (const [group, channels] of Object.entries(data)) {
+                        if (!Array.isArray(channels) || !channels.every(id => typeof id === 'string')) {
+                            alert('Invalid file format.');
+                            return;
+                        }
+                    }
+                    // Replace localStorage config
+                    const groups = {};
+                    Object.entries(data).forEach(([group, ids]) => {
+                        groups[group] = ids.map(id => ({ id, title: '', entries: [] }));
+                    });
+                    saveGroups(groups);
+                    // Optionally clear collapsed state and shorts filter
+                    saveCollapsedGroups({});
+                    saveShortsFilter({});
+                    renderGroups();
+                    alert('Groups imported successfully!');
+                } catch {
+                    alert('Failed to import: invalid JSON or format.');
+                }
+            };
+            reader.readAsText(file);
+            // Reset file input so user can import same file again if needed
+            e.target.value = '';
+        };
 
         // --- Initial render ---
         renderGroups();
