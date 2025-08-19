@@ -1,0 +1,85 @@
+body { font-family: sans-serif; margin: 2em; }
+.group { margin-bottom: 1em; }
+.channels { margin-left: 1em; }
+.plus-btn {
+    background: none;
+    border: none;
+    color: #2ecc40;
+    font-size: 1.5em;
+    cursor: pointer;
+    vertical-align: middle;
+    padding: 0 0.3em;
+}
+.plus-btn:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    background: #222;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    left: 2em;
+    top: 0.2em;
+    white-space: nowrap;
+    z-index: 10;
+    font-size: 0.95em;
+}
+.plus-btn:focus { outline: 2px solid #2ecc40; }
+form { display: inline; }
+.icon-btn {
+    background: none;
+    border: none;
+    color: #e74c3c;
+    font-size: 1.3em;
+    cursor: pointer;
+    vertical-align: middle;
+    padding: 0 0.3em;
+    position: relative;
+}
+.icon-btn:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    background: #222;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    left: 2em;
+    top: 0.2em;
+    white-space: nowrap;
+    z-index: 10;
+    font-size: 0.95em;
+}
+.icon-btn:focus { outline: 2px solid #e74c3c; }
+body.dark-mode {
+    background: #181818;
+    color: #eee;
+}
+body.dark-mode input,
+body.dark-mode button,
+body.dark-mode select,
+body.dark-mode textarea {
+    background: #222;
+    color: #eee;
+    border-color: #444;
+}
+body.dark-mode .group {
+    background: #222;
+    border-radius: 6px;
+    padding: 0.5em 1em;
+}
+body.dark-mode .plus-btn,
+body.dark-mode .icon-btn {
+    color: #2ecc40;
+}
+body.dark-mode .icon-btn[data-tooltip]:hover::after,
+body.dark-mode .plus-btn[data-tooltip]:hover::after {
+    background: #444;
+    color: #fff;
+}
+body.dark-mode a,
+body.dark-mode a:visited {
+    color: #80c8ff;
+    text-decoration: underline;
+}
+body.dark-mode a:hover {
+    color: #fff700;
+}
