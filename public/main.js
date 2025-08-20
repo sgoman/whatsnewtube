@@ -22,13 +22,52 @@ function saveShortsFilter(obj) {
     localStorage.setItem('shortsFilter', JSON.stringify(obj));
 }
 
+// Add these functions above renderGroups()
+window.collapseAllGroups = function() {
+    const groups = getGroups();
+    const collapsed = {};
+    Object.keys(groups).forEach(group => collapsed[group] = true);
+    saveCollapsedGroups(collapsed);
+    renderGroups();
+};
+window.expandAllGroups = function() {
+    saveCollapsedGroups({});
+    renderGroups();
+};
+
 // --- UI rendering ---
 function renderGroups() {
     const groups = getGroups();
     const collapsedGroups = getCollapsedGroups();
     const shortsFilter = getShortsFilter();
+    const allCollapsed = Object.keys(groups).length > 0 && Object.keys(groups).every(group => collapsedGroups[group]);
+    const anyExpanded = Object.keys(groups).some(group => !collapsedGroups[group]);
     const groupsDiv = document.getElementById('groups');
     groupsDiv.innerHTML = '';
+
+    // Ensure the collapse/expand button is always present and up to date
+    let collapseExpandBtn = document.getElementById('collapse-expand-btn');
+    if (collapseExpandBtn) collapseExpandBtn.remove();
+    const groupForm = document.getElementById('group-form');
+    groupForm.insertAdjacentHTML('beforeend', `
+        <button type="button" id="collapse-expand-btn" class="icon-btn" style="margin-left:0.5em;"
+            data-tooltip="${allCollapsed ? 'Expand All Groups' : 'Collapse All Groups'}"
+            title="${allCollapsed ? 'Expand All Groups' : 'Collapse All Groups'}"
+            aria-label="${allCollapsed ? 'Expand All Groups' : 'Collapse All Groups'}">
+            ${allCollapsed ? '&#x25BC;' : '&#x25B2;'}
+        </button>
+    `);
+
+    // Now attach the event listener
+    document.getElementById('collapse-expand-btn').onclick = function() {
+        if (allCollapsed) {
+            window.expandAllGroups();
+        } else if (anyExpanded) {
+            window.collapseAllGroups();
+        }
+    };
+
+    // ...rest of your group rendering code...
     Object.entries(groups).forEach(([group, channels], groupIdx, groupArr) => {
         const groupDiv = document.createElement('div');
         groupDiv.className = 'group';
@@ -54,23 +93,32 @@ function renderGroups() {
                         <div>
                             ${ch.title ? `${ch.title} (${ch.id})` : ch.id}
                             <button onclick="removeChannel('${group}', ${i})" class="icon-btn" data-tooltip="Remove Channel" title="Remove Channel" aria-label="Remove Channel">&#128465;</button>
-                            <button onclick="toggleShorts('${group}','${ch.id}')" class="icon-btn" data-tooltip="${showShorts ? 'Hide Shorts' : 'Show Shorts'}" title="${showShorts ? 'Hide Shorts' : 'Show Shorts'}" aria-label="${showShorts ? 'Hide Shorts' : 'Show Shorts'}">&#x1f456;</button>
+                            <button onclick="toggleShorts('${group}','${ch.id}')"
+                                class="icon-btn"
+                                data-tooltip="${showShorts ? 'Hide Shorts' : 'Show Shorts'}"
+                                title="${showShorts ? 'Hide Shorts' : 'Show Shorts'}"
+                                aria-label="${showShorts ? 'Hide Shorts' : 'Show Shorts'}">
+                                ${showShorts ? '&#129650;' : '&#x1f456;'}
+                            </button>
                             <button onclick="moveChannel('${group}', ${i}, -1)" class="icon-btn" data-tooltip="Move Up" title="Move Up" aria-label="Move Up" ${i === 0 ? 'disabled' : ''}>&#8593;</button>
                             <button onclick="moveChannel('${group}', ${i}, 1)" class="icon-btn" data-tooltip="Move Down" title="Move Down" aria-label="Move Down" ${i === channels.length - 1 ? 'disabled' : ''}>&#8595;</button>
                             ${ch.entries && ch.entries.length ? `
                                 <div style="display: flex; gap: 1em; margin-top: 0.5em;">
-                                    ${ch.entries
-                                        .filter(entry => showShorts || !entry.href.includes('/shorts/'))
-                                        .map(entry => `
-                                            <div style="display: flex; flex-direction: column; align-items: center; width: 160px;">
-                                                ${entry.thumbnail ? `<a href="${entry.href}" target="_blank" rel="noopener">
-                                                    <img src="${entry.thumbnail}" alt="thumbnail" style="width:150px;height:auto;display:block;">
-                                                </a>` : ''}
-                                                <a href="${entry.href}" target="_blank" rel="noopener" style="margin-top: 0.3em; text-align: center; font-size: 0.95em;">
-                                                    ${entry.title}
-                                                </a>
-                                            </div>
-                                        `).join('')}
+                                    ${
+                                        ch.entries
+                                            .filter(entry => showShorts || !entry.href.includes('/shorts/'))
+                                            .sort((a, b) => new Date(b.published) - new Date(a.published))
+                                            .slice(0, 3)
+                                            .map(entry => `
+                                                <div style="display: flex; flex-direction: column; align-items: center; width: 160px;">
+                                                    ${entry.thumbnail ? `<a href="${entry.href}" target="_blank" rel="noopener">
+                                                        <img src="${entry.thumbnail}" alt="thumbnail" style="width:150px;height:auto;display:block;">
+                                                    </a>` : ''}
+                                                    <a href="${entry.href}" target="_blank" rel="noopener" style="margin-top: 0.3em; text-align: center; font-size: 0.95em;">
+                                                        ${entry.title}
+                                                    </a>
+                                                </div>
+                                            `).join('')}
                                 </div>
                             ` : ''}
                         </div>
@@ -119,6 +167,14 @@ document.getElementById('group-form').onsubmit = function(e) {
     saveGroups(groups);
     document.getElementById('group-name').value = '';
     renderGroups();
+    document.getElementById('group-form').insertAdjacentHTML('beforeend', `
+        <button type="button" id="collapse-expand-btn" class="icon-btn" style="margin-left:0.5em;"
+            data-tooltip="${allCollapsed ? 'Expand All Groups' : 'Collapse All Groups'}"
+            title="${allCollapsed ? 'Expand All Groups' : 'Collapse All Groups'}"
+            aria-label="${allCollapsed ? 'Expand All Groups' : 'Collapse All Groups'}">
+            ${allCollapsed ? '&#x25BC;' : '&#x25B2;'}
+        </button>
+    `);
 };
 
 window.deleteGroup = function(group) {

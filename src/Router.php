@@ -35,12 +35,10 @@ class Router {
         // Get channel title
         $title = (string)($xmlObject->title ?? '');
 
-        // Get up to 3 newest entries
+        // Get all entries (do not limit to 3)
         $entries = [];
         if (isset($xmlObject->entry)) {
-            $count = 0;
             foreach ($xmlObject->entry as $entry) {
-                if ($count++ >= 3) break;
                 // Extract thumbnail URL if available
                 $thumbnail = '';
                 if (isset($entry->children('media', true)->group->thumbnail)) {
